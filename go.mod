@@ -1,0 +1,1 @@
+module "Secrets-CLI"
