@@ -6,60 +6,66 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 )
 
-func Encrypt(key string)  error{
-	hasher := md5.New()
-	fmt.Fprint(hasher, key)
-	cipherKey := hasher.Sum(nil)
-	block, err := aes.NewCipher(cipherKey)
+// Encrypt will take in a key and plaintext and return a hex
+// representation of the encrypted value.
+// This code is based on the standard library examples at:
+// - https://golang.org/pkg/crypto/cipher/#NewCFBEncrypter
+func Encrypt(key, plaintext string) (string, error) {
+	block, err := newCipherBlock(key)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	if len(ciphertext) < aes.BlockSize {
-		panic("ciphertext too short")
+	cipherText := make([]byte, aes.BlockSize + len(plaintext))
+	iv := cipherText[:aes.BlockSize]
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return "", err
 	}
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
+
+	stream := cipher.NewCFBDecrypter(block, iv)
+	stream.XORKeyStream(cipherText[aes.BlockSize:], cipherText)
+
+	return fmt.Sprintf("%x", cipherText), nil
+}
+
+// Decrypt will take in a key and a cipherHex (hex representation of
+// the ciphertext) and decrypt it.
+// This code is based on the standard library examples at:
+// - https://golang.org/pkg/crypto/cipher/#NewCFBDecrypter
+func Decrypt(key, cipherHex string) (string, error){
+	block, err := newCipherBlock(key)
+	if err != nil {
+		return "", err
+	}
+
+	cipherText, err := hex.DecodeString(cipherHex)
+	if err != nil {
+		return "", err
+	}
+
+	if len(cipherText) < aes.BlockSize {
+		return "", errors.New("encrypt: cipher too short")
+	}
+	iv := cipherText[:aes.BlockSize]
+	cipherText = cipherText[aes.BlockSize:]
 
 	stream := cipher.NewCFBDecrypter(block, iv)
 
-	// XORKeyStream can work in-place if the two arguments are the same.
-	stream.XORKeyStream(ciphertext, ciphertext)
-	fmt.Printf("%s", ciphertext)
+	stream.XORKeyStream(cipherText, cipherText)
+
+	return string(cipherText), nil
+
 }
 
-func Decrypt() {
-	// Load your secret key from a safe place and reuse it across multiple
-	// NewCipher calls. (Obviously don't use this example key for anything
-	// real.) If you want to convert a passphrase to a key, use a suitable
-	// package like bcrypt or scrypt.
-	key, _ := hex.DecodeString("6368616e676520746869732070617373")
-	plaintext := []byte("some plaintext")
 
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		panic(err)
-	}
-
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
-	iv := ciphertext[:aes.BlockSize]
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		panic(err)
-	}
-
-	stream := cipher.NewCFBEncrypter(block, iv)
-	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
-
-	// It's important to remember that ciphertexts must be authenticated
-	// (i.e. by using crypto/hmac) as well as being encrypted in order to
-	// be secure.
-	fmt.Printf("%x\n", ciphertext)
+func newCipherBlock(key string) (cipher.Block, error) {
+	hasher := md5.New()
+	fmt.Fprint(hasher, key)
+	cipherKey := hasher.Sum(nil)
+	return aes.NewCipher(cipherKey)
 }
