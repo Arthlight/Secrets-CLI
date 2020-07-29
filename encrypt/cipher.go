@@ -20,7 +20,6 @@ func Encrypt(key, plaintext string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	cipherText := make([]byte, aes.BlockSize + len(plaintext))
 	iv := cipherText[:aes.BlockSize]
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
