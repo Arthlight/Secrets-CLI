@@ -21,3 +21,9 @@ func (v *Vault) Get(key string) (string, error) {
 
 	return "", errors.New("secret: no value for that key")
 }
+
+func (v *Vault) Set(key, value string) error {
+	v.keyValues[key] = value
+
+	return nil
+}
