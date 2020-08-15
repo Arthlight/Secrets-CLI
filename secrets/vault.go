@@ -1,6 +1,15 @@
 package secrets
 
-import "errors"
+import (
+	"Secrets-CLI/encrypt"
+	"errors"
+)
+
+type Vault struct {
+	encodingKey string
+	keyValues map[string]string
+}
+
 
 func Memory(encodingKey string) Vault {
 	return Vault{
@@ -9,21 +18,25 @@ func Memory(encodingKey string) Vault {
 	}
 }
 
-type Vault struct {
-	encodingKey string
-	keyValues map[string]string
-}
-
 func (v *Vault) Get(key string) (string, error) {
-	if ret, ok := v.keyValues[key]; ok {
-		return ret, nil
+	hex, ok := v.keyValues[key]
+	if !ok {
+		return "", errors.New("secret: no value for that key")
+	}
+	ret, err := encrypt.Decrypt(v.encodingKey, hex)
+	if err != nil {
+		return "", err
 	}
 
-	return "", errors.New("secret: no value for that key")
+	return ret, nil
 }
 
 func (v *Vault) Set(key, value string) error {
-	v.keyValues[key] = value
+	encryptedValue, err := encrypt.Encrypt(v.encodingKey, value)
+	if err != nil {
+		return err
+	}
+	v.keyValues[key] = encryptedValue
 
 	return nil
 }
