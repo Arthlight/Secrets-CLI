@@ -2,10 +2,10 @@ package secrets
 
 import (
 	"Secrets-CLI/encrypt"
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -34,7 +34,18 @@ func (v * Vault) loadKeyValues() error {
 		return nil
 	}
 	defer file.Close()
-	dec := json.NewDecoder(file)
+	var sb strings.Builder
+	_, err = io.Copy(&sb, file)
+	if err != nil {
+		return err
+	}
+	decryptedJSON, err := encrypt.Decrypt(v.encodingKey, sb. String())
+	if err != nil {
+		return err
+	}
+	reader := strings.NewReader(decryptedJSON)
+
+	dec := json.NewDecoder(reader)
 	err = dec.Decode(&v.keyValues)
 	if err != nil {
 		return err
@@ -67,8 +78,6 @@ func (v * Vault) saveKeyValues() error {
 	return nil
 }
 
-
-
 func (v *Vault) Get(key string) (string, error) {
 	v.Lock()
 	defer v.Unlock()
@@ -87,15 +96,11 @@ func (v *Vault) Get(key string) (string, error) {
 func (v *Vault) Set(key, value string) error {
 	v.Lock()
 	defer v.Unlock()
-	encryptedValue, err := encrypt.Encrypt(v.encodingKey, value)
+	err := v.loadKeyValues()
 	if err != nil {
 		return err
 	}
-	err = v.loadKeyValues()
-	if err != nil {
-		return err
-	}
-	v.keyValues[key] = encryptedValue
+	v.keyValues[key] = value
 	err = v.saveKeyValues()
 
 	return err

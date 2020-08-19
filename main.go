@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	v := secrets.Memory("my-custom-key")
+	v := secrets.File("my-custom-key", ".secrets")
 	err := v.Set("custom_key", "some custom value")
 	if err != nil {
 		panic(err)
