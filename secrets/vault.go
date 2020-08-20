@@ -1,7 +1,7 @@
 package secrets
 
 import (
-	"Secrets-CLI/encrypt"
+	"Secrets-CLI/cipher"
 	"encoding/json"
 	"errors"
 	"fmt"

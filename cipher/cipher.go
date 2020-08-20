@@ -1,4 +1,4 @@
-package encrypt
+package cipher
 
 import (
 	"crypto/aes"
@@ -11,25 +11,55 @@ import (
 	"io"
 )
 
+func encryptStream(key string, iv []byte) (cipher.Stream, error) {
+	block, err := newCipherBlock(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return cipher.NewCFBDecrypter(block, iv), nil
+}
+
 // Encrypt will take in a key and plaintext and return a hex
 // representation of the encrypted value.
 // This code is based on the standard library examples at:
 // - https://golang.org/pkg/crypto/cipher/#NewCFBEncrypter
 func Encrypt(key, plaintext string) (string, error) {
-	block, err := newCipherBlock(key)
-	if err != nil {
-		return "", err
-	}
 	cipherText := make([]byte, aes.BlockSize + len(plaintext))
 	iv := cipherText[:aes.BlockSize]
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		return "", err
 	}
 
-	stream := cipher.NewCFBDecrypter(block, iv)
+	stream, err := encryptStream(key, iv)
+	if err != nil {
+		return "", err
+	}
 	stream.XORKeyStream(cipherText[aes.BlockSize:], cipherText)
 
 	return fmt.Sprintf("%x", cipherText), nil
+}
+
+// EncryptWriter will return a writer that will write encrypted data to
+// the original writer.
+func EncryptWriter(key string, w io.Writer) (*cipher.StreamWriter, error) {
+	iv := make([]byte, aes.BlockSize)
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return nil, err
+	}
+	stream, err := encryptStream(key, iv)
+	if err != nil {
+		return nil, err
+	}
+	n, err := w.Write(iv)
+	if n != len(iv) {
+		return nil, errors.New("cipher: unable to write full initialization vector to writer")
+	}
+
+	return &cipher.StreamWriter{
+		S: stream,
+		W: w,
+	}, nil
 }
 
 // Decrypt will take in a key and a cipherHex (hex representation of
@@ -48,7 +78,7 @@ func Decrypt(key, cipherHex string) (string, error){
 	}
 
 	if len(cipherText) < aes.BlockSize {
-		return "", errors.New("encrypt: cipher too short")
+		return "", errors.New("cipher: cipher too short")
 	}
 	iv := cipherText[:aes.BlockSize]
 	cipherText = cipherText[aes.BlockSize:]
