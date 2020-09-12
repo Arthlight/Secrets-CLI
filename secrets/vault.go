@@ -4,10 +4,8 @@ import (
 	"Secrets-CLI/cipher"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
-	"strings"
 	"sync"
 )
 
@@ -72,7 +70,7 @@ func (v * Vault) save() error {
 func (v *Vault) Get(key string) (string, error) {
 	v.Lock()
 	defer v.Unlock()
-	err := v.loadKeyValues()
+	err := v.load()
 	if err != nil {
 		return "", err
 	}
@@ -87,12 +85,12 @@ func (v *Vault) Get(key string) (string, error) {
 func (v *Vault) Set(key, value string) error {
 	v.Lock()
 	defer v.Unlock()
-	err := v.loadKeyValues()
+	err := v.load()
 	if err != nil {
 		return err
 	}
 	v.keyValues[key] = value
-	err = v.saveKeyValues()
+	err = v.save()
 
 	return err
 }
